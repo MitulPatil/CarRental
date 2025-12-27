@@ -275,15 +275,24 @@ VITE_BACKEND_URL=http://localhost:3000
 
 ## 🚀 Production Deployment
 
-### Backend:
-1. Deploy to services like Heroku, Railway, or Render
-2. Set environment variables
-3. Update CORS settings for production domain
+**For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md)**
 
-### Frontend:
-1. Update `VITE_BACKEND_URL` to production API URL
-2. Build: `npm run build`
-3. Deploy to Vercel, Netlify, or similar
+### Quick Overview:
+- **Database**: MongoDB Atlas (free tier)
+- **Backend**: Render (free tier)  
+- **Frontend**: Vercel (free tier)
+- **Images**: ImageKit (free tier)
+
+### Quick Steps:
+1. Setup MongoDB Atlas cluster
+2. Deploy backend to Render with environment variables
+3. Deploy frontend to Vercel with backend URL
+4. Update CORS settings
+5. Test all functionality
+
+**Total Cost**: $0/month with free tiers 🎉
+
+See [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md) for a quick checklist.
 
 ## 📧 Support
 
