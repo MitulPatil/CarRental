@@ -15,9 +15,17 @@ await connectDB();
 // Middleware
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
-    ? [process.env.FRONTEND_URL] 
+    ? [
+        process.env.FRONTEND_URL, 
+        'https://car-rental-nine-liard.vercel.app',
+        'https://carrental-nine-liard.vercel.app'
+      ].filter(Boolean) // Remove undefined values
     : ['http://localhost:5173', 'http://localhost:5174'],
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions))
 app.use(express.json())
