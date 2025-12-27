@@ -37,7 +37,7 @@ const Navbar = ({setShowLogin}) => {
                     return true;
                 })
                 .map((link,index)=>(
-                    <Link key={index} to={link.path}>
+                    <Link key={index} to={link.path} onClick={() => setOpen(false)}>
                         {link.name}
                     </Link>
                 ))}
@@ -46,10 +46,10 @@ const Navbar = ({setShowLogin}) => {
                 {!loading && (
                     <>
                         {isAuthenticated && user?.role === 'owner' && (
-                            <button onClick={()=> navigate('/owner')} className="cursor-pointer hover:text-primary transition-colors">Owner Dashboard</button>
+                            <button onClick={()=> { navigate('/owner'); setOpen(false); }} className="cursor-pointer hover:text-primary transition-colors">Owner Dashboard</button>
                         )}
                         {isAuthenticated && user?.role === 'user' && (
-                            <button onClick={()=> navigate('/my-bookings')} className="cursor-pointer hover:text-primary transition-colors">My Bookings</button>
+                            <button onClick={()=> { navigate('/my-bookings'); setOpen(false); }} className="cursor-pointer hover:text-primary transition-colors">My Bookings</button>
                         )}
                         {isAuthenticated ? (
                             <div className='flex items-center gap-4'>
