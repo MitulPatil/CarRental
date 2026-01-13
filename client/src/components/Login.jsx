@@ -40,20 +40,39 @@ const Login = ({setShowLogin}) => {
             const response = await axios.post(url, data);
 
             if (response.data.success) {
-                // Store token using auth context and get user data
-                await login(response.data.token);
-                toast.success(state === "login" ? "Login successful!" : "Account created successfully!");
-                
-                setShowLogin(false);
-                // Reset form
-                setName("");
-                setEmail("");
-                setPassword("");
-                setRole("user");
+                // Check if pending approval
+                if (response.data.pendingApproval) {
+                    toast.info("Registration successful! Your account is pending admin approval. You will receive an email once approved.", {
+                        autoClose: 8000
+                    });
+                    setShowLogin(false);
+                    // Reset form
+                    setName("");
+                    setEmail("");
+                    setPassword("");
+                    setRole("user");
+                } else {
+                    // Store token using auth context and get user data
+                    await login(response.data.token);
+                    toast.success(state === "login" ? "Login successful!" : "Account created successfully!");
+                    
+                    setShowLogin(false);
+                    // Reset form
+                    setName("");
+                    setEmail("");
+                    setPassword("");
+                    setRole("user");
+                }
             } else {
                 const errorMsg = response.data.message || "Something went wrong";
                 setError(errorMsg);
-                toast.error(errorMsg);
+                
+                // Show specific message for pending approval
+                if (response.data.pendingApproval) {
+                    toast.info(errorMsg, { autoClose: 8000 });
+                } else {
+                    toast.error(errorMsg);
+                }
             }
         } catch (err) {
             const errorMsg = err.response?.data?.message || err.message || "An error occurred. Please check your connection.";
