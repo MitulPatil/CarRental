@@ -2,11 +2,30 @@ import nodemailer from 'nodemailer';
 
 // Create email transporter
 const createTransporter = () => {
+    // Use SendGrid for production (works with all hosting platforms)
+    if (process.env.SENDGRID_API_KEY) {
+        return nodemailer.createTransport({
+            host: 'smtp.sendgrid.net',
+            port: 587,
+            secure: false,
+            auth: {
+                user: 'apikey',
+                pass: process.env.SENDGRID_API_KEY
+            }
+        });
+    }
+    
+    // Fallback to Gmail for local development
     return nodemailer.createTransport({
-        service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 587,
+        secure: false,
         auth: {
             user: process.env.ADMIN_EMAIL,
             pass: process.env.ADMIN_EMAIL_PASSWORD
+        },
+        tls: {
+            rejectUnauthorized: false
         }
     });
 };
