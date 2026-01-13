@@ -402,8 +402,9 @@ export const verifyEmail = async (req, res) => {
         // Generate JWT token for auto-login
         const authToken = generateToken(createdUser._id.toString(), pendingUser.role);
         
-        // Redirect to frontend with token
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        // Redirect to frontend with token as URL parameter
+        const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+        const redirectUrl = `${frontendUrl}?token=${authToken}&verified=true&name=${encodeURIComponent(pendingUser.name)}`;
         
         res.send(`
             <html>
@@ -416,27 +417,28 @@ export const verifyEmail = async (req, res) => {
                         .details { background: #f0f8f4; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #4CAF50; }
                         .btn { background-color: #4CAF50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 20px; font-size: 16px; }
                         .btn:hover { background-color: #45a049; }
+                        .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #4CAF50; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+                        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
                     </style>
                     <script>
-                        // Store token and redirect
-                        localStorage.setItem('token', '${authToken}');
+                        // Redirect immediately
                         setTimeout(() => {
-                            window.location.href = '${frontendUrl}';
-                        }, 3000);
+                            window.location.href = '${redirectUrl}';
+                        }, 2000);
                     </script>
                 </head>
                 <body>
                     <div class="container">
                         <div class="icon">✅</div>
-                        <h2 class="success">Registration Complete!</h2>
+                        <h2 class="success">Account Created Successfully!</h2>
                         <div class="details">
                             <p><strong>Name:</strong> ${pendingUser.name}</p>
                             <p><strong>Email:</strong> ${pendingUser.email}</p>
                             <p><strong>Role:</strong> ${pendingUser.role === 'owner' ? 'Car Owner' : 'User'}</p>
                         </div>
-                        <p>Your email has been verified and your account has been created successfully!</p>
-                        <p>Redirecting you to the dashboard...</p>
-                        <a href="${frontendUrl}" class="btn">Go to Dashboard Now</a>
+                        <p>Your email has been verified and your account has been created!</p>
+                        <div class="spinner"></div>
+                        <p>Redirecting you to login...</p>
                     </div>
                 </body>
             </html>
