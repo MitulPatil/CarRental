@@ -2,20 +2,29 @@ import nodemailer from 'nodemailer';
 
 // Create email transporter
 const createTransporter = () => {
+    // Log for debugging
+    console.log('Email Config Check:', {
+        hasSendGridKey: !!process.env.SENDGRID_API_KEY,
+        hasAdminEmail: !!process.env.ADMIN_EMAIL,
+        sendGridKeyLength: process.env.SENDGRID_API_KEY?.length || 0
+    });
+    
     // Use SendGrid for production (works with all hosting platforms)
-    if (process.env.SENDGRID_API_KEY) {
+    if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_API_KEY.trim() !== '') {
+        console.log('✅ Using SendGrid for email');
         return nodemailer.createTransport({
             host: 'smtp.sendgrid.net',
             port: 587,
             secure: false,
             auth: {
                 user: 'apikey',
-                pass: process.env.SENDGRID_API_KEY
+                pass: process.env.SENDGRID_API_KEY.trim()
             }
         });
     }
     
     // Fallback to Gmail for local development
+    console.log('⚠️ Using Gmail fallback (SendGrid key not found)');
     return nodemailer.createTransport({
         host: 'smtp.gmail.com',
         port: 587,
