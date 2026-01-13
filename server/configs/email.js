@@ -200,3 +200,68 @@ export const sendUserRejectionEmail = async (userName, userEmail) => {
         throw error;
     }
 };
+// Send email verification email
+export const sendVerificationEmail = async (userName, userEmail, verificationToken) => {
+    try {
+        const transporter = createTransporter();
+        
+        const verificationLink = `${process.env.BACKEND_URL || 'http://localhost:3000'}/api/user/verify-email/${verificationToken}`;
+        
+        const mailOptions = {
+            from: process.env.ADMIN_EMAIL,
+            to: userEmail,
+            subject: 'Verify Your Email Address',
+            html: `
+                <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f4;">
+                    <div style="max-width: 600px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                        <h2 style="color: #4CAF50;">
+                            Email Verification Required
+                        </h2>
+                        
+                        <p style="font-size: 16px; color: #555;">
+                            Hello ${userName},
+                        </p>
+                        
+                        <p style="font-size: 16px; color: #555;">
+                            Thank you for registering! Please verify your email address to complete your registration.
+                        </p>
+                        
+                        <p style="font-size: 16px; color: #555;">
+                            Click the button below to verify your email address:
+                        </p>
+                        
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="${verificationLink}" style="background-color: #4CAF50; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-size: 16px;">
+                                Verify Email Address
+                            </a>
+                        </div>
+                        
+                        <p style="font-size: 14px; color: #888;">
+                            Or copy and paste this link in your browser:<br>
+                            <a href="${verificationLink}" style="color: #4CAF50;">${verificationLink}</a>
+                        </p>
+                        
+                        <p style="font-size: 14px; color: #888;">
+                            <strong>Important:</strong> This verification link will expire in 24 hours.
+                        </p>
+                        
+                        <p style="font-size: 14px; color: #888;">
+                            If you didn't create an account, please ignore this email.
+                        </p>
+                        
+                        <p style="font-size: 14px; color: #888; text-align: center; margin-top: 30px;">
+                            Thank you for joining us!
+                        </p>
+                    </div>
+                </div>
+            `
+        };
+        
+        await transporter.sendMail(mailOptions);
+        console.log(`Verification email sent to ${userEmail}`);
+        return true;
+    } catch (error) {
+        console.error('Error sending verification email:', error);
+        throw error;
+    }
+};

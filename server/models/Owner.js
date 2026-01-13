@@ -19,18 +19,6 @@ const ownerSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
-    isApproved: {
-        type: Boolean,
-        default: false
-    },
-    approvalToken: {
-        type: String,
-        default: null
-    },
-    approvedAt: {
-        type: Date,
-        default: null
-    },
     businessName: {
         type: String,
         default: ""

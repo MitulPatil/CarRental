@@ -40,8 +40,18 @@ const Login = ({setShowLogin}) => {
             const response = await axios.post(url, data);
 
             if (response.data.success) {
-                // Check if pending approval
-                if (response.data.pendingApproval) {
+                // Check if requires email verification (registration)
+                if (response.data.requiresEmailVerification) {
+                    toast.success("Verification email sent successfully! Please check your email and click the verification link.", {
+                        autoClose: 8000
+                    });
+                    setShowLogin(false);
+                    // Reset form
+                    setName("");
+                    setEmail("");
+                    setPassword("");
+                    setRole("user");
+                } else if (response.data.pendingApproval) {
                     toast.info("Registration successful! Your account is pending admin approval. You will receive an email once approved.", {
                         autoClose: 8000
                     });
@@ -67,8 +77,8 @@ const Login = ({setShowLogin}) => {
                 const errorMsg = response.data.message || "Something went wrong";
                 setError(errorMsg);
                 
-                // Show specific message for pending approval
-                if (response.data.pendingApproval) {
+                // Show specific message for pending approval or email verification
+                if (response.data.pendingApproval || response.data.requiresEmailVerification) {
                     toast.info(errorMsg, { autoClose: 8000 });
                 } else {
                     toast.error(errorMsg);

@@ -22,18 +22,6 @@ const userSchema = new mongoose.Schema({
    image:{
        type:String,
        default:""
-   },
-   isApproved:{
-       type:Boolean,
-       default:false
-   },
-   approvalToken:{
-       type:String,
-       default:null
-   },
-   approvedAt:{
-       type:Date,
-       default:null
    }
 },{timestamps:true})
 

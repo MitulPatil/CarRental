@@ -1,9 +1,10 @@
 import bcrypt from 'bcrypt';
 import User from '../models/User.js';
 import Owner from '../models/Owner.js';
+import PendingUser from '../models/PendingUser.js';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import { sendAdminNotificationEmail, sendUserApprovalEmail, sendUserRejectionEmail } from '../configs/email.js';
+import { sendAdminNotificationEmail, sendUserApprovalEmail, sendUserRejectionEmail, sendVerificationEmail } from '../configs/email.js';
 
 // Generate JWT Token
 const generateToken = (userId, role)=>{
@@ -28,76 +29,53 @@ export const registerUser = async (req,res)=>{
         return res.json({success: false, message : "Please provide a valid email address"})
        }
        
-       // Generate approval token
-       const approvalToken = crypto.randomBytes(32).toString('hex');
+       // Check if user already exists in main collections
+       const existingUser = await User.findOne({email});
+       const existingOwner = await Owner.findOne({email});
        
-       if (role === 'owner') {
-           // Check if owner already exists
-           const ownerExists = await Owner.findOne({email});
-           if(ownerExists){
-            return res.json({success: false, message : "Owner already exists"})
-           }
-           
-           const hashedpassword = await bcrypt.hash(password,10);
-           
-           const owner = await Owner.create({
-            name,
-            email,
-            password: hashedpassword,
-            isApproved: false,
-            approvalToken
+       if(existingUser || existingOwner){
+        return res.json({success: false, message : "This email is already registered. Please login instead."})
+       }
+       
+       // Check if already pending verification
+       const pendingUser = await PendingUser.findOne({email});
+       if(pendingUser){
+        return res.json({success: false, message : "A verification email has already been sent to this address. Please check your email or try again after 24 hours."})
+       }
+       
+       // Hash password
+       const hashedpassword = await bcrypt.hash(password,10);
+       
+       // Generate verification token
+       const verificationToken = crypto.randomBytes(32).toString('hex');
+       const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+       
+       // Store in pending collection
+       await PendingUser.create({
+           name,
+           email,
+           password: hashedpassword,
+           role: role || 'user',
+           verificationToken,
+           verificationExpires
+       });
+       
+       // Send verification email
+       try {
+           await sendVerificationEmail(name, email, verificationToken);
+           return res.json({
+               success: true, 
+               message: `Registration initiated! We've sent a verification link to ${email}. Please check your email and click the link to complete your registration. The link will expire in 24 hours.`,
+               requiresEmailVerification: true
            })
-           
-           // Send notification to admin
-           try {
-               await sendAdminNotificationEmail(name, email, 'owner', approvalToken);
-               return res.json({
-                   success: true, 
-                   message: "Registration request submitted! Admin approval is required. You will receive an email once approved.",
-                   pendingApproval: true
-               })
-           } catch (emailError) {
-               console.error('Email sending failed:', emailError);
-               // Still create the account but inform about email failure
-               return res.json({
-                   success: true, 
-                   message: "Registration request submitted! Admin will be notified. You will receive an email once approved.",
-                   pendingApproval: true
-               })
-           }
-       } else {
-           // Regular user registration
-           const userExists = await User.findOne({email});
-           if(userExists){
-            return res.json({success: false, message : "User already exists"})
-           }
-
-           const hashedpassword = await bcrypt.hash(password,10);
-
-           const user = await User.create({
-            name,
-            email,
-            password:hashedpassword,
-            isApproved: false,
-            approvalToken
+       } catch (emailError) {
+           console.error('Email sending failed:', emailError);
+           // Delete pending user if email fails
+           await PendingUser.deleteOne({ email });
+           return res.json({
+               success: false, 
+               message: "Failed to send verification email. Please make sure you're using a valid email address and try again."
            })
-           
-           // Send notification to admin
-           try {
-               await sendAdminNotificationEmail(name, email, 'user', approvalToken);
-               return res.json({
-                   success: true, 
-                   message: "Registration request submitted! Admin approval is required. You will receive an email once approved.",
-                   pendingApproval: true
-               })
-           } catch (emailError) {
-               console.error('Email sending failed:', emailError);
-               return res.json({
-                   success: true, 
-                   message: "Registration request submitted! Admin will be notified. You will receive an email once approved.",
-                   pendingApproval: true
-               })
-           }
        }
 
     } catch (error) {
@@ -107,7 +85,6 @@ export const registerUser = async (req,res)=>{
 }
 
 // login user
-
 export const loginuser = async (req,res)=>{
     try {
         const {email,password} = req.body;
@@ -129,16 +106,7 @@ export const loginuser = async (req,res)=>{
         }
         
         if(!user){
-            return res.json({success: false, message : "User does not exist"});
-        }
-        
-        // Check if user is approved
-        if(!user.isApproved){
-            return res.json({
-                success: false, 
-                message : "Your account is pending admin approval. You will receive an email once approved.",
-                pendingApproval: true
-            });
+            return res.json({success: false, message : "No account found with this email. Please sign up first."});
         }
         
         const isMatch = await bcrypt.compare(password , user.password);
@@ -370,6 +338,126 @@ export const rejectUser = async (req, res) => {
                     <div class="container">
                         <h2 class="error">❌ Error</h2>
                         <p>An error occurred while rejecting the user: ${error.message}</p>
+                    </div>
+                </body>
+            </html>
+        `);
+    }
+};
+// Verify email and create user account
+export const verifyEmail = async (req, res) => {
+    try {
+        const { token } = req.params;
+        
+        // Find pending user with matching verification token
+        const pendingUser = await PendingUser.findOne({ 
+            verificationToken: token,
+            verificationExpires: { $gt: Date.now() } // Check if token hasn't expired
+        });
+        
+        if (!pendingUser) {
+            return res.send(`
+                <html>
+                    <head>
+                        <style>
+                            body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f4f4f4; }
+                            .container { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; max-width: 500px; }
+                            .error { color: #f44336; }
+                            .icon { font-size: 48px; margin-bottom: 20px; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="container">
+                            <div class="icon">❌</div>
+                            <h2 class="error">Invalid or Expired Link</h2>
+                            <p>This verification link is invalid or has expired. Verification links are valid for 24 hours.</p>
+                            <p>Please register again to receive a new verification link.</p>
+                        </div>
+                    </body>
+                </html>
+            `);
+        }
+        
+        // Create user in appropriate collection based on role
+        let createdUser;
+        if (pendingUser.role === 'owner') {
+            createdUser = await Owner.create({
+                name: pendingUser.name,
+                email: pendingUser.email,
+                password: pendingUser.password,
+                isApproved: true,
+                approvedAt: new Date()
+            });
+        } else {
+            createdUser = await User.create({
+                name: pendingUser.name,
+                email: pendingUser.email,
+                password: pendingUser.password
+            });
+        }
+        
+        // Delete pending user
+        await PendingUser.deleteOne({ _id: pendingUser._id });
+        
+        // Generate JWT token for auto-login
+        const authToken = generateToken(createdUser._id.toString(), pendingUser.role);
+        
+        // Redirect to frontend with token
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        
+        res.send(`
+            <html>
+                <head>
+                    <style>
+                        body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f4f4f4; }
+                        .container { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; max-width: 500px; }
+                        .success { color: #4CAF50; }
+                        .icon { font-size: 48px; margin-bottom: 20px; }
+                        .details { background: #f0f8f4; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #4CAF50; }
+                        .btn { background-color: #4CAF50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 20px; font-size: 16px; }
+                        .btn:hover { background-color: #45a049; }
+                    </style>
+                    <script>
+                        // Store token and redirect
+                        localStorage.setItem('token', '${authToken}');
+                        setTimeout(() => {
+                            window.location.href = '${frontendUrl}';
+                        }, 3000);
+                    </script>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="icon">✅</div>
+                        <h2 class="success">Registration Complete!</h2>
+                        <div class="details">
+                            <p><strong>Name:</strong> ${pendingUser.name}</p>
+                            <p><strong>Email:</strong> ${pendingUser.email}</p>
+                            <p><strong>Role:</strong> ${pendingUser.role === 'owner' ? 'Car Owner' : 'User'}</p>
+                        </div>
+                        <p>Your email has been verified and your account has been created successfully!</p>
+                        <p>Redirecting you to the dashboard...</p>
+                        <a href="${frontendUrl}" class="btn">Go to Dashboard Now</a>
+                    </div>
+                </body>
+            </html>
+        `);
+        
+    } catch (error) {
+        console.error('Email verification error:', error);
+        res.send(`
+            <html>
+                <head>
+                    <style>
+                        body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f4f4f4; }
+                        .container { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; }
+                        .error { color: #f44336; }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <h2 class="error">❌ Error</h2>
+                        <p>An error occurred during email verification. Please try again later.</p>
+                        <p style="color: #666; font-size: 14px;">${error.message}</p>
                     </div>
                 </body>
             </html>
